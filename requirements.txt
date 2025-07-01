@@ -1,0 +1,9 @@
+# No external dependencies required for this application
+# The application uses only Python standard library modules:
+# - argparse
+# - csv
+# - re
+# - sys
+# - dataclasses
+# - typing
+# - logging

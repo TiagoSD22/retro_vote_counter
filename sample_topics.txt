@@ -1,0 +1,41 @@
+Joao
+2:45 PM
+1-any text
+2-any text
+3-any text
+
+:1:
+5
+:2:
+12
+
+Mike
+2:46 PM
+1-any text
+2-any text
+
+:2:
+8
+
+Sarah
+3:15 PM
+1-Machine Learning Applications
+2-Data Analysis Best Practices
+3-Python Performance Optimization
+
+:1:
+15
+:2:
+7
+:3:
+23
+
+David
+3:20 PM
+1-Web Development Trends
+2-Cloud Computing Solutions
+
+:1:
+3
+:2:
+11

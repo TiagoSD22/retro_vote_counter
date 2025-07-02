@@ -72,28 +72,30 @@ class VoteCounter:
     
     def _split_into_message_blocks(self, content: str) -> List[str]:
         """Split content into individual message blocks."""
-        # Remove empty lines and split by double newlines or name patterns
-        lines = [line.strip() for line in content.split('\n')]
+        lines = [line.strip() for line in content.split('\n') if line.strip()]
         
         blocks = []
         current_block = []
+        i = 0
         
-        for line in lines:
-            if not line:  # Empty line
-                continue
-                
-            # Check if this line looks like a name (not starting with digit or colon)
-            # and we already have content in current_block
+        while i < len(lines):
+            line = lines[i]
+            
+            # If we have a current block and this line looks like a new name
+            # (not a topic, vote, or time line), start a new block
             if (current_block and 
                 not re.match(r'^\d+[-:]', line) and  # Not a topic line
-                not re.match(r'^:\d+:', line) and    # Not a vote line
-                not re.match(r'^\d{1,2}:\d{2}\s*(AM|PM)', line)):  # Not a time line
+                not re.match(r'^:\d+:', line) and    # Not a vote line  
+                not re.match(r'^\d{1,2}:\d{2}\s*(AM|PM)', line) and  # Not a time line
+                not line.isdigit()):  # Not a vote count
                 
-                # This might be a new message, save current block
+                # Save current block and start new one
                 blocks.append('\n'.join(current_block))
                 current_block = [line]
             else:
                 current_block.append(line)
+            
+            i += 1
         
         # Add the last block
         if current_block:
@@ -106,18 +108,28 @@ class VoteCounter:
         lines = [line.strip() for line in block.split('\n') if line.strip()]
         
         if len(lines) < 2:
+            logger.debug(f"Skipping block with insufficient lines: {lines}")
             return None
             
         # First line should be the author name
         author = lines[0]
+        logger.debug(f"Parsing message from author: {author}")
         
         # Second line should be the timestamp
-        timestamp_match = re.match(r'(\d{1,2}:\d{2}\s*(AM|PM))', lines[1])
+        timestamp_pattern = r'(\d{1,2}:\d{2}\s*(AM|PM))'
+        timestamp_match = re.match(timestamp_pattern, lines[1])
         if not timestamp_match:
             logger.warning(f"Could not parse timestamp from: {lines[1]}")
-            return None
-            
-        timestamp = timestamp_match.group(1)
+            # Try to find timestamp in next few lines
+            timestamp = "Unknown"
+            for j in range(1, min(4, len(lines))):
+                if re.match(timestamp_pattern, lines[j]):
+                    timestamp = re.match(timestamp_pattern, lines[j]).group(1)
+                    break
+        else:
+            timestamp = timestamp_match.group(1)
+        
+        logger.debug(f"Timestamp: {timestamp}")
         
         # Parse topics and votes
         topics = {}
@@ -126,6 +138,7 @@ class VoteCounter:
         i = 2  # Start after name and timestamp
         while i < len(lines):
             line = lines[i]
+            logger.debug(f"Processing line {i}: '{line}'")
             
             # Check for topic line (starts with number-)
             topic_match = re.match(r'^(\d+)-(.+)$', line)
@@ -133,21 +146,29 @@ class VoteCounter:
                 topic_num = int(topic_match.group(1))
                 topic_subject = topic_match.group(2).strip()
                 topics[topic_num] = topic_subject
+                logger.debug(f"Found topic {topic_num}: {topic_subject}")
             
             # Check for vote line (:number:)
             vote_match = re.match(r'^:(\d+):$', line)
             if vote_match:
                 topic_num = int(vote_match.group(1))
+                logger.debug(f"Found vote marker for topic {topic_num}")
                 # Next line should be the vote count
                 if i + 1 < len(lines):
                     try:
                         vote_count = int(lines[i + 1])
                         votes[topic_num] = vote_count
+                        logger.debug(f"Topic {topic_num} has {vote_count} votes")
                         i += 1  # Skip the vote count line
                     except ValueError:
                         logger.warning(f"Could not parse vote count: {lines[i + 1]}")
+                else:
+                    logger.warning(f"Vote marker found but no vote count follows for topic {topic_num}")
             
             i += 1
+        
+        logger.debug(f"Message parsed - Topics: {topics}, Votes: {votes}")
+        return Message(author=author, timestamp=timestamp, topics=topics, votes=votes)
         
         return Message(author=author, timestamp=timestamp, topics=topics, votes=votes)
     
